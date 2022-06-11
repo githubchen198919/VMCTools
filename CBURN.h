@@ -34,11 +34,14 @@ public:
 	CEdit m_exit_success;
 	CEdit m_exit_fail;
 	afx_msg void OnBnClickedButtonStartBurn();
+	afx_msg void MyFunctionBurnFailedIcon(int dev_num);
+	afx_msg void MyFunctionBurnSuccessIcon(int dev_num);
 	afx_msg void InitBurnProgress();
 	afx_msg CString MyFunctionBurnGetExePath();
 	afx_msg void MyFunctionBurnBitMap();
 	afx_msg void MyFunctionPrintDebug(int dev_num, CString buf);
 	afx_msg UINT MyFunctionBurnSpiNandImage(int dev_num, struct _libusb_work_sb* myfunc_work_sb, struct _libusb_burn* myfunc_burn_sb);
+	afx_msg UINT MyFunctionBurnEmmcImage(int dev_num, struct _libusb_work_sb* myfunc_work_sb, struct _libusb_burn* myfunc_burn_sb);
 	afx_msg CString MyFunctionBurnDownloadImage(int dev_num, struct _libusb_work_sb* myfunc_work_sb, CString download_file_path, CString download_file_address_tmp);
 	afx_msg CString MyFunctionBurnDownloadCmd(int dev_num, struct _libusb_work_sb* myfunc_work_sb, char* cmd_name, int cmd_len);
 	afx_msg CString MyFunctionBurnProCmd(int dev_num, struct _libusb_work_sb* myfunc_work_sb, struct _libusb_burn b);

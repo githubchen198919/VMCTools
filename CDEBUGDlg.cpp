@@ -731,6 +731,94 @@ CString CDEBUGDlg::MyFunctionProCmd(struct _libusb_work_sb *myfunc_work_sb, stru
 		m_progress_debug_burn.SetPos(npos);
 
 	} 
+	else if (!b.BurnImageCmd.Compare(_T("mmc write")))
+	{
+		// Emmc start
+		
+		if (!b.DownloadImageName.Compare(TEXT(EMMC_BOOT_BIN)))
+		{
+			cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, LIBUSB_MMC_BOOT_PART, strlen(LIBUSB_MMC_BOOT_PART));
+			if (!cmd_status.Compare(_T("ERROR")))
+			{
+				MessageBox(TEXT("mmc partconf 1 0 1 1 set failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+				return _T("ERROR");
+			}
+
+			cmd_boot.Empty();
+			cmd_boot += _T("mmc write");
+			cmd_boot += _T(" ");
+			cmd_boot += b.DownloadDdrAddress;
+			cmd_boot += _T(" ");
+			cmd_boot += b.PartitionOffset;
+			cmd_boot += _T(" ");
+			cmd_boot += b.PartitionSize;
+
+			CString2Char(cmd_boot, cmd_name);
+			cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, cmd_name, cmd_boot.GetLength());
+			if (!cmd_status.Compare(_T("ERROR")))
+			{
+				return _T("ERROR");
+			}
+
+			cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, LIBUSB_MMC_USER_PART, strlen(LIBUSB_MMC_USER_PART));
+			if (!cmd_status.Compare(_T("ERROR")))
+			{
+				MessageBox(TEXT("mmc partconf 1 0 0 0 set failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+				m_burn_status.SetWindowTextW(_T("烧录失败"));
+				return _T("ERROR");
+			}
+			
+		} 
+		else
+		{
+			cmd_boot.Empty();
+			cmd_boot += _T("mmc write");
+			cmd_boot += _T(" ");
+			cmd_boot += b.DownloadDdrAddress;
+			cmd_boot += _T(" ");
+			cmd_boot += b.PartitionOffset;
+			cmd_boot += _T(" ");
+			cmd_boot += b.PartitionSize;
+			cmd_boot += _T(" ");
+			cmd_boot += _T("offset");
+
+			CString2Char(cmd_boot, cmd_name);
+			cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, cmd_name, cmd_boot.GetLength());
+			if (!cmd_status.Compare(_T("ERROR")))
+			{
+				return _T("ERROR");
+			}
+
+			// 烧写备份内核
+			if (b.backup_partition_flag == true)
+			{
+				cmd_boot.Empty();
+				cmd_boot += _T("mmc write");
+				cmd_boot += _T(" ");
+				cmd_boot += b.DownloadDdrAddress;
+				cmd_boot += _T(" ");
+				cmd_boot += b.PartitionOffset1;
+				cmd_boot += _T(" ");
+				cmd_boot += b.PartitionSize;
+				cmd_boot += _T(" ");
+				cmd_boot += _T("offset");
+
+				CString2Char(cmd_boot, cmd_name);
+				cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, cmd_name, cmd_boot.GetLength());
+				if (!cmd_status.Compare(_T("ERROR")))
+				{
+					return _T("ERROR");
+				}
+			}
+
+		}
+
+		npos += 10;
+		m_progress_debug_burn.SetPos(npos);
+
+		// Emmc end
+
+	}
 	else 
 	{
 		cmd_boot.Empty();
@@ -927,13 +1015,15 @@ UINT CDEBUGDlg::MyFunctionSpiNandBurnImage(struct _libusb_work_sb *myfunc_work_s
 	int i;
 	int npos = m_progress_debug_burn.GetPos();
 
+
+
 	// 一 : 从init文件获取参数
 	for (i = 0; i < imagecount; i++) 
 	{
 		downloadimage.Format(_T("DOWNLOADIMAGE%d"), i);
 
 		// 1 : 获取地址参数
-		GetPrivateProfileString(downloadimage, TEXT("DownloadDdrAddress"), TEXT(LIBUSB_DOWN_ADDRESS),
+		GetPrivateProfileString(TEXT("DDRADDRESS"), TEXT("DownloadDdrAddress"), TEXT(LIBUSB_DOWN_ADDRESS),
 								GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
 								exe_dir + TEXT(LIBUSB_SPINAND_INI));
 		CString2Char(GetTmp, char_boot_name);
@@ -1042,6 +1132,11 @@ UINT CDEBUGDlg::MyFunctionSpiNandBurnImage(struct _libusb_work_sb *myfunc_work_s
 
 	if (i == imagecount)
 	{
+		// setenv stage boot
+		cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, SET_STAGE_BOOT, strlen(SET_STAGE_BOOT));
+		// saveenv
+		cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, SAVE_ENV, strlen(SAVE_ENV));
+
 		m_progress_debug_burn.SetPos(100);
 
 		m_burn_status.SetWindowTextW(_T("烧录成功"));
@@ -1066,11 +1161,204 @@ NandBurnImageEnd:
 	return 0;
 }
 
+// Emmc 烧录
+UINT CDEBUGDlg::MyFunctionEmmcBurnImage(struct _libusb_work_sb* myfunc_work_sb, struct _libusb_burn* myfunc_burn_sb)
+{
+	CString  exe_dir;
+	CString str_boot_dir, str_boot_name;
+	char char_boot_name[MAX_PATH] = { 0 };
+
+	exe_dir = MyFunctionGetExePath();
+
+	str_boot_dir = exe_dir;
+	str_boot_dir += LIBUSB_IMAGE_PATH;
+
+	int imagecount = GetPrivateProfileInt(TEXT("ImageCount"), TEXT("numOfImage"), 0, exe_dir + TEXT(LIBUSB_EMMC_INI));
+	if (imagecount == 0)
+	{
+		MessageBox(TEXT("无镜像文件"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+		m_button_debug_start.EnableWindow(true);
+		m_button_debug_cmd.EnableWindow(true);
+		m_button_debug_file.EnableWindow(true);
+		m_burn_status.SetWindowTextW(_T("未烧录"));
+		return -1;
+	}
+	CString downloadimage;
+	CString GetTmp;
+	int i;
+	int npos = m_progress_debug_burn.GetPos();
+
+	// 一 : 从init文件获取参数
+	for (i = 0; i < imagecount; i++)
+	{
+		downloadimage.Format(_T("DOWNLOADIMAGE%d"), i);
+
+		// 1 : 获取地址参数
+		GetPrivateProfileString(TEXT("DDRADDRESS"), TEXT("DownloadDdrAddress"), TEXT(LIBUSB_DOWN_ADDRESS),
+			GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));
+		CString2Char(GetTmp, char_boot_name);
+		myfunc_burn_sb[i].DownloadDdrAddress = UTF82WCS(char_boot_name);
+
+		//AfxMessageBox(myfunc_burn_sb[i].DownloadDdrAddress);
+
+		// 2 : 获取是否烧录参数
+		myfunc_burn_sb[i].NeedBurn = GetPrivateProfileInt(downloadimage, TEXT("NeedBurn"), 0,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));
+
+		// 3 : 获取烧录镜像命令
+		/*myfunc_burn_sb[i].ImageFlag = GetPrivateProfileInt(downloadimage, TEXT("ImageFlag"), 0,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));*/
+		GetPrivateProfileString(downloadimage, TEXT("BurnImageCmd"), TEXT("NoBurnImageCmd"),
+			GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));
+
+		CString2Char(GetTmp, char_boot_name);
+		myfunc_burn_sb[i].BurnImageCmd = UTF82WCS(char_boot_name);
+
+		//AfxMessageBox(myfunc_burn_sb[i].BurnImageCmd);
+
+		// 4 : 获取镜像路径
+		GetPrivateProfileString(downloadimage, TEXT("DownloadImageName"), TEXT("NoDownloadImageName"),
+			GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));
+
+		CString2Char(GetTmp, char_boot_name);
+		str_boot_name = UTF82WCS(char_boot_name);
+
+		myfunc_burn_sb[i].DownloadImageName.Empty();
+		myfunc_burn_sb[i].DownloadImageName = char_boot_name;
+
+		//AfxMessageBox(myfunc_burn_sb[i].DownloadImageName);
+
+		myfunc_burn_sb[i].DownloadImagePath.Empty();
+		myfunc_burn_sb[i].DownloadImagePath += str_boot_dir;
+		myfunc_burn_sb[i].DownloadImagePath += char_boot_name;
+
+		//AfxMessageBox(myfunc_burn_sb[i].DownloadImagePath);
+
+		// 5 : 内核镜像有个备份分区
+		if (strncmp(LIBUSB_UKERNEL, (char*)char_boot_name, strlen(LIBUSB_UKERNEL)) == 0)
+		{
+			GetPrivateProfileString(downloadimage, TEXT("PartitionOffset1"), TEXT("NoPartitionOffset1"),
+				GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+				exe_dir + TEXT(LIBUSB_EMMC_INI));
+			myfunc_burn_sb[i].backup_partition_flag = true;
+
+			CString2Char(GetTmp, char_boot_name);
+			myfunc_burn_sb[i].PartitionOffset1 = UTF82WCS(char_boot_name);
+
+			//AfxMessageBox(myfunc_burn_sb[i].PartitionOffset1);
+		}
+
+		// 6 : 获取分区大小
+		GetPrivateProfileString(downloadimage, TEXT("PartitionSize"), TEXT("NoPartitionSize"),
+			GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));
+
+		CString2Char(GetTmp, char_boot_name);
+		myfunc_burn_sb[i].PartitionSize = UTF82WCS(char_boot_name);
+
+		//AfxMessageBox(myfunc_burn_sb[i].PartitionSize);
+
+		// 7 : 获取分区偏移
+		GetPrivateProfileString(downloadimage, TEXT("PartitionOffset"), TEXT("NoPartitionOffset"),
+			GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+			exe_dir + TEXT(LIBUSB_EMMC_INI));
+
+		CString2Char(GetTmp, char_boot_name);
+		myfunc_burn_sb[i].PartitionOffset = UTF82WCS(char_boot_name);
+
+		//AfxMessageBox(myfunc_burn_sb[i].PartitionOffset);
+
+		npos += 5;
+		m_progress_debug_burn.SetPos(npos);
+	}
+
+	// 二 : 执行烧录
+	CString cmd_status;
+
+	cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, LIBUSB_MMC_DEV_1, strlen(LIBUSB_MMC_DEV_1));
+	if (!cmd_status.Compare(_T("ERROR")))
+	{
+		MessageBox(TEXT("mmc dev 1 set failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+		m_burn_status.SetWindowTextW(_T("烧录失败"));
+		return -1;
+	}
+
+	
+	for (i = 0; i < imagecount; i++)
+	{
+		if (myfunc_burn_sb[i].NeedBurn)
+		{
+
+			myfunc_burn_sb[i].Download_Size = MyFunctionDownloadImage(myfunc_work_sb,
+				myfunc_burn_sb[i].DownloadImagePath,
+				myfunc_burn_sb[i].DownloadDdrAddress);
+			if (!myfunc_burn_sb[i].Download_Size.Compare(_T("ERROR")))
+			{
+				MessageBox(TEXT("烧录失败（Download File）"), TEXT("提示"), MB_OK | MB_ICONWARNING);
+				m_burn_status.SetWindowTextW(_T("烧录失败"));
+				return -1;
+			}
+
+			cmd_status = MyFunctionProCmd(myfunc_work_sb, myfunc_burn_sb[i]);
+			if (!cmd_status.Compare(_T("ERROR")))
+			{
+				MessageBox(TEXT("烧录失败（Download Cmd）"), TEXT("提示"), MB_OK | MB_ICONWARNING);
+				m_burn_status.SetWindowTextW(_T("烧录失败"));
+				return -1;
+			}
+		}
+		else
+		{
+			//MessageBox(TEXT("没有可烧写的镜像"), TEXT("温馨提示"), MB_OK | MB_ICONWARNING);
+		}
+	}
+
+	if (i == imagecount)
+	{
+		// setenv stage boot
+		cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, SET_STAGE_BOOT, strlen(SET_STAGE_BOOT));
+		// saveenv
+		cmd_status = MyFunctionDownloadCmd(myfunc_work_sb, SAVE_ENV, strlen(SAVE_ENV));
+
+		m_progress_debug_burn.SetPos(100);
+
+		m_burn_status.SetWindowTextW(_T("烧录成功"));
+
+		UINT i = MessageBoxTimeout(NULL, _T("5s 将自动重启，是否重启？"), _T("温馨提示"),
+			MB_YESNO | MB_ICONINFORMATION,
+			GetSystemDefaultLangID(),
+			5000);
+		if (i == IDNO)
+		{
+			goto NandBurnImageEnd;
+		}
+
+		MyFunctionDownloadCmd(myfunc_work_sb, "reset", strlen("reset"));
+	}
+
+NandBurnImageEnd:
+	m_button_debug_start.EnableWindow(true);
+	m_button_debug_cmd.EnableWindow(true);
+	m_button_debug_file.EnableWindow(true);
+
+	return 0;
+}
+
 UINT ThreadButtonKeyBurn(LPVOID pParam)
 {
 	CDEBUGDlg* pObj = (CDEBUGDlg*)pParam;
 
 	return pObj->MyFunctionSpiNandBurnImage(&libusb_work_sb_debug, libusb_burn);
+}
+
+UINT ThreadEmmcBurn(LPVOID pParam)
+{
+	CDEBUGDlg* pObj = (CDEBUGDlg*)pParam;
+
+	return pObj->MyFunctionEmmcBurnImage(&libusb_work_sb_debug, libusb_burn);
 }
 
 void CDEBUGDlg::OnBnClickedButtonKeyBurn()
@@ -1107,8 +1395,17 @@ void CDEBUGDlg::OnBnClickedButtonKeyBurn()
 	else if (!GetMediaType.Compare(_T(LIBUSB_MEDIA_EMMC)))
 	{
 
-		MessageBox(TEXT("emmc烧录，暂未支持！！！"), TEXT("温馨提示"), MB_OK | MB_ICONWARNING);
-		goto error_end;
+		//MessageBox(TEXT("emmc烧录，暂未支持！！！"), TEXT("温馨提示"), MB_OK | MB_ICONWARNING);
+		//goto error_end;
+
+		CString Handshake_status = MyFunctionHandshake(&libusb_work_sb_debug);
+		if (!Handshake_status.Compare(_T("ERROR")))
+		{
+			goto error_end;
+		}
+
+
+		m_pThread = AfxBeginThread(ThreadEmmcBurn, this);
 	}
 	else
 	{

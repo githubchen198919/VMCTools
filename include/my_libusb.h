@@ -27,6 +27,13 @@ extern "C"
 	#define 	LIBUSB_VMCTOOLS_INI 	"\\VMCTools.ini"
 	#define 	LIBUSB_SPINAND_INI 		"\\VMCToolsSpiNand.ini"
 	#define 	LIBUSB_EMMC_INI 		"\\VMCToolsEmmc.ini"
+	#define 	SET_STAGE_BOOT 			"setenv stage boot"
+	#define 	SET_STAGE_UPDATE 		"setenv stage update"
+	#define 	SAVE_ENV 				"saveenv"
+	#define 	LIBUSB_MMC_DEV_1 		"mmc dev 1"
+	#define 	LIBUSB_MMC_BOOT_PART 	"mmc partconf 1 0 1 1"
+	#define 	LIBUSB_MMC_USER_PART 	"mmc partconf 1 0 0 0"
+	#define 	EMMC_BOOT_BIN 			"VIM_BOOT.bin"
 
 	#define USTART  0xFA
 	#define UHEAD   0xFE
@@ -63,6 +70,8 @@ extern "C"
 		CString DownloadDdrAddress;
 		int NeedBurn;
 		CString BurnImageCmd;
+		// Emmc
+		CString DownloadImageName;
 		CString DownloadImagePath;
 		CString PartitionSize;
 		CString PartitionOffset;

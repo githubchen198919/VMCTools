@@ -40,6 +40,7 @@ public:
 	CButton m_button_key_burn;
 	afx_msg void OnBnClickedButtonKeyBurn();
 	afx_msg UINT MyFunctionSpiNandBurnImage(struct _libusb_work_sb *myfunc_work_sb, struct _libusb_burn* myfunc_burn_sb);
+	afx_msg UINT MyFunctionEmmcBurnImage(struct _libusb_work_sb *myfunc_work_sb, struct _libusb_burn* myfunc_burn_sb);
 	afx_msg CString MyFunctionHandshake(struct _libusb_work_sb *myfunc_work_sb);
 	afx_msg CString MyFunctionGetExePath();
 	afx_msg CString MyFunctionDownloadImage(struct _libusb_work_sb *myfunc_work_sb, CString download_file_path, CString download_file_address_tmp);
