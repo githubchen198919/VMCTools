@@ -22,6 +22,11 @@ struct _bitmap_dev bitmap_dev;
 CMutex global_Mutex(0, 0, 0);
 CMutex global_print(0, 0, 0);
 
+// 自动
+int IsStop = 0;
+int update_dev_num = 0;
+CWinThread* m_auto_device_pThread = nullptr;
+
 // CBURN 对话框
 
 IMPLEMENT_DYNAMIC(CBURN, CDialogEx)
@@ -814,6 +819,9 @@ void CBURN::MyFunctionBurnCheckDeleteButton()
 	if (x + y == z)
 	{
 		m_button_delete_device.EnableWindow(true);
+		// 自动获取设备
+		m_button_access_device.EnableWindow(true);
+		m_button_start_burn.EnableWindow(true);
 	}
 }
 
@@ -1184,6 +1192,215 @@ UINT CBURN::MyFunctionBurnSpiNandImage(int dev_num, struct _libusb_work_sb* myfu
 }
 
 
+/*
+* 自动获取设备
+*/
+void CBURN::UpdateAccessDevice()
+{
+	// TODO: 在此添加控件通知处理程序代码
+
+	int ret = 0;
+	//int dev_num = 0;
+	int i = 0, j;
+	int ep_cnt;
+	CString str_vid(_T("0x0AC8"));
+	CString str_pid(_T("0x7680"));
+	CString kk;
+
+	//GetDlgItem(IDC_EDIT_DEBUG_VID)->GetWindowText(str_vid);
+	//GetDlgItem(IDC_EDIT_DEBUG_PID)->GetWindowText(str_pid);
+	//GetDlgItemText(IDC_EDIT_DEBUG_VID, str_vid);
+	//AfxMessageBox(str_vid);
+
+	ret = libusb_init(NULL);
+	if (ret < 0)
+	{
+		MessageBox(TEXT("libusb_init failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+		return;
+	}
+
+	// get usb device list
+	ret = libusb_get_device_list(NULL, &my_access_list);
+	if (ret < 0)
+	{
+		MessageBox(TEXT("libusb_get_device_list failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+
+		goto get_failed;
+	}
+
+
+
+
+	/* check the matched device */
+	while ((my_usbdev = my_access_list[i++]) != NULL)
+	{
+
+		libusb_get_device_descriptor(my_usbdev, &my_dev_desc);
+
+#if 1
+		if (my_dev_desc.idVendor == _tcstoul(str_vid, 0, 16) &&
+			my_dev_desc.idProduct == _tcstoul(str_pid, 0, 16) && !IsStop && update_dev_num < BURN_MAX_DEVICE)
+		{
+			//kk.Format(_T("%d %#x:%#x"), i, my_dev_desc.idVendor, my_dev_desc.idProduct);
+			//MessageBoxTimeout(NULL, kk, _T("提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 5000);
+
+			Sleep(600);
+
+			/* open usb device */
+			ret = libusb_open(my_usbdev, &libusb_work_sb_burn[update_dev_num].handle);
+			if (ret < 0)
+			{
+				//MessageBox(TEXT("libusb_open failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+				//goto open_failed;
+				continue;
+			}
+
+			CString str_bus_hub_num;
+			str_bus_hub_num.Format(_T("USB%d:%d"), libusb_get_bus_number(my_usbdev), libusb_get_port_number(my_usbdev));
+
+			/* get config descriptor */
+			ret = libusb_get_config_descriptor(my_usbdev, 0, &libusb_work_sb_burn[update_dev_num].config_desc);
+			if (ret < 0)
+			{
+				//MessageBox(TEXT("get config descriptor failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+				//goto configdesc_fail;
+				//update_dev_num--;
+				//libusb_close(libusb_work_sb_burn[update_dev_num].handle);
+
+				continue;
+			}
+
+			ep_cnt = libusb_work_sb_burn[update_dev_num].config_desc->interface->altsetting[0].bNumEndpoints;
+
+			/* get bulk in/out ep */
+			for (j = 0; j < ep_cnt; j++)
+			{
+				libusb_work_sb_burn[update_dev_num].ep_desc =
+					&libusb_work_sb_burn[update_dev_num].config_desc->interface->altsetting[0].endpoint[j];
+				if ((libusb_work_sb_burn[update_dev_num].ep_desc->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) & LIBUSB_TRANSFER_TYPE_BULK)
+				{
+					if ((libusb_work_sb_burn[update_dev_num].ep_desc->bEndpointAddress & LIBUSB_ENDPOINT_DIR_MASK) & LIBUSB_ENDPOINT_IN)
+					{
+
+						libusb_work_sb_burn[update_dev_num].ep_bulkin = libusb_work_sb_burn[update_dev_num].ep_desc->bEndpointAddress;
+					}
+					else
+					{
+						libusb_work_sb_burn[update_dev_num].ep_bulkout = libusb_work_sb_burn[update_dev_num].ep_desc->bEndpointAddress;
+					}
+				}
+			}
+
+			/* claim the interface */
+			libusb_detach_kernel_driver(libusb_work_sb_burn[update_dev_num].handle, 0);
+			ret = libusb_claim_interface(libusb_work_sb_burn[update_dev_num].handle, 0);
+			if (ret < 0)
+			{
+				//MessageBox(TEXT("claim usb interface failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+				//goto claim_failed;
+				//update_dev_num--;
+				//libusb_close(libusb_work_sb_burn[update_dev_num].handle);
+				continue;
+			}
+
+			//MyFunctionBurnHandshake(&libusb_work_sb_burn[update_dev_num]);
+
+			//MessageBoxTimeout(NULL, _T("设备绑定成功"), _T("提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 1000);
+
+			switch (update_dev_num)
+			{
+				case 0:
+					m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_connect);
+					m_burn_dev1.SetWindowTextW(str_bus_hub_num);
+					break;
+				case 1:
+					m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_connect);
+					m_burn_dev2.SetWindowTextW(str_bus_hub_num);
+					break;
+				case 2:
+					m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_connect);
+					m_burn_dev3.SetWindowTextW(str_bus_hub_num);
+					break;
+				case 3:
+					m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_connect);
+					m_burn_dev4.SetWindowTextW(str_bus_hub_num);
+					break;
+				case 4:
+					m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_connect);
+					m_burn_dev5.SetWindowTextW(str_bus_hub_num);
+					break;
+				case 5:
+					m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_connect);
+					m_burn_dev6.SetWindowTextW(str_bus_hub_num);
+					break;
+			}
+
+			update_dev_num++;
+
+			CString Total_num;
+			Total_num.Format(_T("%d"), update_dev_num);
+
+			SetDlgItemText(IDC_EDIT_TOTAL, Total_num);
+
+			m_button_access_device.EnableWindow(false);
+			m_button_start_burn.EnableWindow(true);
+			//m_button_delete_device.EnableWindow(true);
+
+			if (update_dev_num == 6)
+				break;
+		}
+#endif
+		//MessageBox(TEXT("3!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
+	}
+
+	return;
+
+open_failed:
+
+	libusb_free_device_list(my_access_list, 1);
+
+get_failed:
+	libusb_exit(NULL);
+
+	return;
+}
+
+UINT CBURN::UpdateAccessDevice1()
+{
+	m_button_access_device.EnableWindow(false);
+
+	while (!IsStop)
+	{
+		UpdateAccessDevice();
+
+		Sleep(1000);
+	}
+
+	MessageBoxTimeout(NULL, _T("自动扫描设备结束，即将开始烧录"), _T("温馨提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 1000);
+
+	return 0;
+}
+
+UINT ThreadUpdate(LPVOID pParam)
+{
+	CBURN* pObj = (CBURN*)pParam;
+	
+	return pObj->UpdateAccessDevice1();
+}
+
+void CBURN::OnBnClickedButtonAccessDevice()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	//CWinThread* m_auto_device_pThread = nullptr;
+
+	OnBnClickedButtonDeleteDevice();
+	IsStop = 0;
+	update_dev_num = 0;
+
+	m_auto_device_pThread = AfxBeginThread(ThreadUpdate, this);
+}
+
+#if 0
 void CBURN::OnBnClickedButtonAccessDevice()
 {
 	// TODO: 在此添加控件通知处理程序代码
@@ -1346,7 +1563,7 @@ get_failed:
 
 	return;
 }
-
+#endif
 
 
 UINT ThreadSpiNandDevice0(LPVOID pParam)
@@ -1419,6 +1636,20 @@ void CBURN::InitBurnProgress()
 void CBURN::OnBnClickedButtonStartBurn()
 {
 	// TODO: 在此添加控件通知处理程序代码
+	// 自动
+	m_button_start_burn.EnableWindow(false);
+	m_button_access_device.EnableWindow(false);
+
+	IsStop = 1;
+	
+	if (m_auto_device_pThread != NULL)
+	{
+		WaitForSingleObject(m_auto_device_pThread->m_hThread, INFINITE); //等待线程结束
+		//delete m_auto_device_pThread;
+		m_auto_device_pThread = NULL;
+	}
+	
+
 	CWinThread* m_pThread_dev_0 = nullptr;
 	CWinThread* m_pThread_dev_1 = nullptr;
 	CWinThread* m_pThread_dev_2 = nullptr;
@@ -1628,12 +1859,17 @@ void CBURN::OnBnClickedButtonStartBurn()
 	}
 	else if (!GetMediaType.Compare(_T(LIBUSB_MEDIA_EMMC)))
 	{
+		// 自动
+		m_button_start_burn.EnableWindow(true);
 
 		MessageBox(TEXT("emmc烧录，暂未支持！！！"), TEXT("温馨提示"), MB_OK | MB_ICONWARNING);
 		//goto error_end;
 	}
 	else
 	{
+		// 自动
+		m_button_start_burn.EnableWindow(true);
+
 		MessageBox(TEXT("媒体介质选择有误，请选一种支持的烧录介质！！！"), TEXT("温馨提示"), MB_OK | MB_ICONWARNING);
 		//goto error_end;
 	}

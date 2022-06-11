@@ -22,6 +22,8 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnBnClickedButtonAccessDevice();
+	afx_msg void UpdateAccessDevice();
+	afx_msg UINT UpdateAccessDevice1();
 	CStatic m_burn_dev1;
 	CStatic m_burn_dev2;
 	CStatic m_burn_dev3;

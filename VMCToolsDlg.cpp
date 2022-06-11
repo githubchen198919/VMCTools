@@ -235,6 +235,13 @@ BOOL CVMCToolsDlg::OnInitDialog()
 		}
 	}
 
+	// 自动
+	commandcount = GetPrivateProfileInt(TEXT("SystemConf"), TEXT("AutoFlag"), 0, exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+	if (commandcount == 1)
+	{
+		m_burnDlg.OnBnClickedButtonAccessDevice();
+	}
+
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
