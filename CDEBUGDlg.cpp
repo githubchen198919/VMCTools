@@ -403,9 +403,8 @@ exit_dtb:
 }
 
 
-void CDEBUGDlg::OnBnClickedButtonDebugDownCmd()
+UINT CDEBUGDlg::PthDebugDownCmd()
 {
-	// TODO: 在此添加控件通知处理程序代码
 	int ret, cmd_len;
 	CString cmd_boot, str_address_dtb, str_address_kernel;
 	char cmd_name[MAX_PATH] = { 0 };
@@ -416,7 +415,7 @@ void CDEBUGDlg::OnBnClickedButtonDebugDownCmd()
 	CString2Char(cmd_boot, cmd_name);
 
 	cmd_len = cmd_boot.GetLength();
-	if (cmd_len == 0) 
+	if (cmd_len == 0)
 	{
 		MessageBox(TEXT("命令为空"), TEXT("错误"), MB_OK | MB_ICONWARNING);
 		goto cmd_end;
@@ -426,33 +425,33 @@ void CDEBUGDlg::OnBnClickedButtonDebugDownCmd()
 	memcpy(&libusb_work_sb_debug.buffer[3], cmd_name, cmd_len);
 
 	ret = libusb_bulk_transfer(libusb_work_sb_debug.handle, libusb_work_sb_debug.ep_bulkout,
-					libusb_work_sb_debug.buffer, 3 + cmd_len,
-					&libusb_work_sb_debug.transfered, TIMEOUT);
-	if (ret == 0) 
+		libusb_work_sb_debug.buffer, 3 + cmd_len,
+		&libusb_work_sb_debug.transfered, TIMEOUT);
+	if (ret == 0)
 	{
 		ret = libusb_bulk_transfer(libusb_work_sb_debug.handle, libusb_work_sb_debug.ep_bulkin,
-						libusb_work_sb_debug.buffer, sizeof(libusb_work_sb_debug.buffer), 
-						&libusb_work_sb_debug.transfered, TIMEOUT*50);
-		if (ret == 0) 
+			libusb_work_sb_debug.buffer, sizeof(libusb_work_sb_debug.buffer),
+			&libusb_work_sb_debug.transfered, TIMEOUT * 50);
+		if (ret == 0)
 		{
-			if (strncmp(EOT_OK, (char*)libusb_work_sb_debug.buffer, libusb_work_sb_debug.transfered) == 0) 
+			if (strncmp(EOT_OK, (char*)libusb_work_sb_debug.buffer, libusb_work_sb_debug.transfered) == 0)
 			{
-				/*MessageBoxTimeout(NULL, _T("命令处理成功"), _T("提示"),
+				MessageBoxTimeout(NULL, _T("命令处理成功"), _T("提示"),
 								MB_ICONINFORMATION,
 								GetSystemDefaultLangID(),
-								300);*/
-			} 
-			else 
+								500);
+			}
+			else
 			{
 				MessageBox(TEXT("命令处理失败"), TEXT("错误"), MB_OK | MB_ICONWARNING);
 			}
-		} 
-		else 
+		}
+		else
 		{
 			MessageBox(TEXT("libusb_work_sb_debug start in failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
 		}
-	} 
-	else 
+	}
+	else
 	{
 		MessageBox(TEXT("libusb_work_sb_debug cmd failed!"), TEXT("错误"), MB_OK | MB_ICONWARNING);
 	}
@@ -460,6 +459,24 @@ void CDEBUGDlg::OnBnClickedButtonDebugDownCmd()
 cmd_end:
 	m_button_debug_cmd.EnableWindow(true);
 
+	return 0;
+}
+
+UINT ThreadButtonDownloadCmd(LPVOID pParam)
+{
+	CDEBUGDlg* pObj = (CDEBUGDlg*)pParam;
+
+	return pObj->PthDebugDownCmd();
+}
+
+
+void CDEBUGDlg::OnBnClickedButtonDebugDownCmd()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	CWinThread* m_pThread_download_cmd = nullptr;
+
+	m_pThread_download_cmd = AfxBeginThread(ThreadButtonDownloadCmd, this);
+	
 }
 
 void CDEBUGDlg::OnCbnSelchangeCombo1()

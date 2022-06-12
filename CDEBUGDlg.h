@@ -35,6 +35,7 @@ public:
 	afx_msg void OnBnClickedButtonStart();
 	afx_msg void OnBnClickedButtonDebugDown();
 	afx_msg void OnBnClickedButtonDebugDownCmd();
+	afx_msg UINT PthDebugDownCmd();
 	CComboBox m_combobox_debug_cmd;
 	afx_msg void OnCbnSelchangeCombo1();
 	CButton m_button_key_burn;
