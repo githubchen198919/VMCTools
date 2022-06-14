@@ -478,7 +478,6 @@ void CVMCToolsDlg::OnTcnSelchangeTab1(NMHDR* pNMHDR, LRESULT* pResult)
 			tabRect.top += 26;
 			break;
 	}
-	//tabRect.top += 26;
 
 	switch (m_tab.GetCurSel()) 
 	{
