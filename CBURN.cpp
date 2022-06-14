@@ -1742,7 +1742,7 @@ void CBURN::UpdateAccessDevice()
 			//kk.Format(_T("%d %#x:%#x"), i, my_dev_desc.idVendor, my_dev_desc.idProduct);
 			//MessageBoxTimeout(NULL, kk, _T("提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 5000);
 
-			Sleep(600);
+			Sleep(800);
 
 			/* open usb device */
 			ret = libusb_open(my_usbdev, &libusb_work_sb_burn[update_dev_num].handle);
