@@ -78,6 +78,7 @@ void CBURN::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK_RESET, m_need_reset);
 	DDX_Control(pDX, IDC_EDIT_DEBUG_PRINT, m_edit_debug_print);
 	DDX_Text(pDX, IDC_EDIT_DEBUG_PRINT, m_cstring_debug_print);
+	DDX_Control(pDX, IDC_COMBO_BURN_MEDIA_TYPE, m_burn_media_type);
 }
 
 
@@ -85,6 +86,7 @@ BEGIN_MESSAGE_MAP(CBURN, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_ACCESS_DEVICE, &CBURN::OnBnClickedButtonAccessDevice)
 	ON_BN_CLICKED(IDC_BUTTON_START_BURN, &CBURN::OnBnClickedButtonStartBurn)
 	ON_BN_CLICKED(IDC_BUTTON_DELETE_DEVICE, &CBURN::OnBnClickedButtonDeleteDevice)
+	ON_CBN_SELCHANGE(IDC_COMBO_BURN_MEDIA_TYPE, &CBURN::OnCbnSelchangeComboBurnMediaType)
 END_MESSAGE_MAP()
 
 
@@ -946,9 +948,10 @@ void CBURN::MyFunctionBurnCheckDeleteButton()
 
 	if (x + y == z)
 	{
-		m_button_delete_device.EnableWindow(true);
+		// 关闭删除按钮
+		//m_button_delete_device.EnableWindow(true);
 		// 自动获取设备
-		m_button_access_device.EnableWindow(true);
+		//m_button_access_device.EnableWindow(true);
 		m_button_start_burn.EnableWindow(true);
 	}
 }
@@ -1887,8 +1890,10 @@ void CBURN::OnBnClickedButtonAccessDevice()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	//CWinThread* m_auto_device_pThread = nullptr;
+	
+	// 关闭删除按钮
+	//OnBnClickedButtonDeleteDevice();
 
-	OnBnClickedButtonDeleteDevice();
 	IsStop = 0;
 	update_dev_num = 0;
 
@@ -2205,7 +2210,8 @@ void CBURN::OnBnClickedButtonStartBurn()
 	int burn_fail_num;
 
 	//m_button_access_device.EnableWindow(false);
-	m_button_delete_device.EnableWindow(false);
+	// 关闭删除按钮
+	//m_button_delete_device.EnableWindow(false);
 
 	SetDlgItemText(IDC_EDIT_SUCCESS, _T("0"));
 	SetDlgItemText(IDC_EDIT_FAIL, _T("0"));
@@ -2267,6 +2273,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 					m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 					m_pThread_dev_0 = AfxBeginThread(ThreadSpiNandDevice0, this);
+					if (m_pThread_dev_0 == NULL)
+					{
+						m_button_start_burn.EnableWindow(true);
+						m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+						global_print.Lock();
+						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						global_print.Unlock();
+					}
+
 					break;
 				case 1:
 					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[1]);
@@ -2293,6 +2309,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 					m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 					m_pThread_dev_1 = AfxBeginThread(ThreadSpiNandDevice1, this);
+					if (m_pThread_dev_1 == NULL)
+					{
+						m_button_start_burn.EnableWindow(true);
+						m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+						global_print.Lock();
+						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						global_print.Unlock();
+					}
+
 					break;
 				case 2:
 					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[2]);
@@ -2319,6 +2345,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 					m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 					m_pThread_dev_2 = AfxBeginThread(ThreadSpiNandDevice2, this);
+					if (m_pThread_dev_2 == NULL)
+					{
+						m_button_start_burn.EnableWindow(true);
+						m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+						global_print.Lock();
+						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						global_print.Unlock();
+					}
+
 					break;
 				case 3:
 					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[3]);
@@ -2345,6 +2381,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 					m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 					m_pThread_dev_3 = AfxBeginThread(ThreadSpiNandDevice3, this);
+					if (m_pThread_dev_3 == NULL)
+					{
+						m_button_start_burn.EnableWindow(true);
+						m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+						global_print.Lock();
+						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						global_print.Unlock();
+					}
+
 					break;
 				case 4:
 					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[4]);
@@ -2371,6 +2417,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 					m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 					m_pThread_dev_4 = AfxBeginThread(ThreadSpiNandDevice4, this);
+					if (m_pThread_dev_4 == NULL)
+					{
+						m_button_start_burn.EnableWindow(true);
+						m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+						global_print.Lock();
+						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						global_print.Unlock();
+					}
+
 					break;
 				case 5:
 					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[5]);
@@ -2397,6 +2453,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 					m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 					m_pThread_dev_5 = AfxBeginThread(ThreadSpiNandDevice5, this);
+					if (m_pThread_dev_5 == NULL)
+					{
+						m_button_start_burn.EnableWindow(true);
+						m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+						global_print.Lock();
+						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						global_print.Unlock();
+					}
+
 					break;
 			}
 		}
@@ -2448,6 +2514,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 				m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 				m_pThread_dev_0 = AfxBeginThread(ThreadEmmcDevice0, this);
+				if (m_pThread_dev_0 == NULL)
+				{
+					m_button_start_burn.EnableWindow(true);
+					m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+					global_print.Lock();
+					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					global_print.Unlock();
+				}
+
 				break;
 			case 1:
 				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[1]);
@@ -2474,6 +2550,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 				m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 				m_pThread_dev_1 = AfxBeginThread(ThreadEmmcDevice1, this);
+				if (m_pThread_dev_1 == NULL)
+				{
+					m_button_start_burn.EnableWindow(true);
+					m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+					global_print.Lock();
+					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					global_print.Unlock();
+				}
+
 				break;
 			case 2:
 				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[2]);
@@ -2500,6 +2586,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 				m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 				m_pThread_dev_2 = AfxBeginThread(ThreadEmmcDevice2, this);
+				if (m_pThread_dev_2 == NULL)
+				{
+					m_button_start_burn.EnableWindow(true);
+					m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+					global_print.Lock();
+					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					global_print.Unlock();
+				}
+
 				break;
 			case 3:
 				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[3]);
@@ -2526,6 +2622,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 				m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 				m_pThread_dev_3 = AfxBeginThread(ThreadEmmcDevice3, this);
+				if (m_pThread_dev_3 == NULL)
+				{
+					m_button_start_burn.EnableWindow(true);
+					m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+					global_print.Lock();
+					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					global_print.Unlock();
+				}
+
 				break;
 			case 4:
 				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[4]);
@@ -2552,6 +2658,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 				m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 				m_pThread_dev_4 = AfxBeginThread(ThreadEmmcDevice4, this);
+				if (m_pThread_dev_4 == NULL)
+				{
+					m_button_start_burn.EnableWindow(true);
+					m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+					global_print.Lock();
+					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					global_print.Unlock();
+				}
+
 				break;
 			case 5:
 				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[5]);
@@ -2578,6 +2694,16 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 				m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
 				m_pThread_dev_5 = AfxBeginThread(ThreadEmmcDevice5, this);
+				if (m_pThread_dev_5 == NULL)
+				{
+					m_button_start_burn.EnableWindow(true);
+					m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
+
+					global_print.Lock();
+					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					global_print.Unlock();
+				}
+
 				break;
 			}
 		}
@@ -2655,3 +2781,21 @@ void CBURN::OnBnClickedButtonDeleteDevice()
 	//libusb_exit(NULL);
 }
 
+
+
+void CBURN::OnCbnSelchangeComboBurnMediaType()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	int nSel = m_burn_media_type.GetCurSel();
+	if (nSel >= 0)
+	{
+		//根据 索引 获取对应的字符串
+		CString strSel;
+		m_burn_media_type.GetLBText(nSel, strSel);
+
+		//将字符串保存到ini文件中
+		CString exe_dir = MyFunctionBurnGetExePath();
+
+		WritePrivateProfileString(TEXT("SystemConf"), TEXT("mediaType"), strSel, exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+	}
+}

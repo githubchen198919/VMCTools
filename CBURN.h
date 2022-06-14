@@ -75,4 +75,6 @@ public:
 	CEdit m_edit_debug_print;
 	CString m_cstring_debug_print;
 	afx_msg void OnBnClickedButtonSaveLog();
+	CComboBox m_burn_media_type;
+	afx_msg void OnCbnSelchangeComboBurnMediaType();
 };

@@ -114,8 +114,8 @@ BOOL CVMCToolsDlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 
-	//MoveWindow
-
+	// 原方式
+#if 0
 	m_tab.InsertItem(0, _T("烧录"));
 	m_tab.InsertItem(1, _T("调试"));
 
@@ -240,6 +240,150 @@ BOOL CVMCToolsDlg::OnInitDialog()
 	if (commandcount == 1)
 	{
 		m_burnDlg.OnBnClickedButtonAccessDevice();
+	}
+#endif 
+
+
+	m_tab.InsertItem(0, _T("烧录"));
+
+	m_burnDlg.Create(IDD_DIALOG_BURN, &m_tab);
+
+	HDC hdc = ::GetDC(NULL);
+	int hdpi = GetDeviceCaps(hdc, LOGPIXELSX);//水平方向每逻辑英寸多少个像素点
+	int wdpi = GetDeviceCaps(hdc, LOGPIXELSY);//垂直方向每逻辑英寸多少个像素点
+
+	CRect tab_crect;
+	m_tab.GetClientRect(&tab_crect);
+	tab_crect.left += 1;
+	tab_crect.right -= 1;
+	tab_crect.bottom -= 1;
+
+	switch (hdpi)
+	{
+		case 96:
+			tab_crect.top += 22;
+			break;
+		case 120:
+			tab_crect.top += 26;
+			break;
+		case 144:
+			tab_crect.top += 30;
+			break;
+		case 168:
+			tab_crect.top += 33;
+			break;
+		case 192:
+			tab_crect.top += 38;
+			break;
+		default:
+			tab_crect.top += 26;
+			break;
+	}
+
+	m_burnDlg.SetWindowPos(NULL, tab_crect.left, tab_crect.top,
+		tab_crect.Width() - 2, tab_crect.Height() - 1, SWP_SHOWWINDOW);
+
+	m_burnDlg.SetDlgItemText(IDC_EDIT_TOTAL, _T("0"));
+	m_burnDlg.SetDlgItemText(IDC_EDIT_SUCCESS, _T("0"));
+	m_burnDlg.SetDlgItemText(IDC_EDIT_FAIL, _T("0"));
+
+	m_burnDlg.m_burn_media_type.AddString(_T("spi nand"));
+	m_burnDlg.m_burn_media_type.AddString(_T("emmc"));
+
+	m_burnDlg.m_button_start_burn.EnableWindow(false);
+	m_burnDlg.m_button_delete_device.EnableWindow(false);
+
+	m_burnDlg.MyFunctionBurnBitMap();
+
+	CString exe_dir = m_burnDlg.MyFunctionBurnGetExePath();
+	CString GetTmp, GetUboot_Command;
+
+	GetPrivateProfileString(TEXT("SystemConf"), TEXT("mediaType"), TEXT(" "),
+				GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+				exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+
+	if (!GetTmp.Compare(_T(LIBUSB_MEDIA_SPINAND)))
+	{
+		m_burnDlg.m_burn_media_type.SetCurSel(0);
+	}
+	if (!GetTmp.Compare(_T(LIBUSB_MEDIA_EMMC)))
+	{
+		m_burnDlg.m_burn_media_type.SetCurSel(1);
+	}
+
+	// 自动扫描，自动打开就不创建调试界面
+	int autoFlag = GetPrivateProfileInt(TEXT("SystemConf"), TEXT("AutoFlag"), 0, exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+	if (autoFlag == 1)
+	{
+		m_burnDlg.OnBnClickedButtonAccessDevice();
+	}
+	else
+	{
+		m_tab.InsertItem(1, _T("调试"));
+		m_debugDlg.Create(IDD_DIALOG_DEBUG, &m_tab);
+
+		m_debugDlg.SetWindowPos(NULL, tab_crect.left, tab_crect.top,
+			tab_crect.Width() - 2, tab_crect.Height() - 1, SWP_HIDEWINDOW);
+
+		m_debugDlg.m_button_debug_connect.EnableWindow(true);
+		m_debugDlg.m_button_debug_disconnect.EnableWindow(false);
+		m_debugDlg.m_button_debug_start.EnableWindow(false);
+		m_debugDlg.m_button_debug_cmd.EnableWindow(false);
+		m_debugDlg.m_button_debug_file.EnableWindow(false);
+		m_debugDlg.m_button_key_burn.EnableWindow(false);
+		m_debugDlg.setText(IDC_EDIT_DEBUG_VID, _T(LIBUSB_VID));
+		m_debugDlg.setText(IDC_EDIT_DEBUG_PID, _T(LIBUSB_PID));
+		m_debugDlg.setText(IDC_EDIT_DEBUG_DOWN_FILE, _T(LIBUSB_UKERNEL));
+		m_debugDlg.setText(IDC_EDIT_DEBUG_DOWN_DDRADDRESS, _T(LIBUSB_DOWN_ADDRESS));
+		m_debugDlg.setText(IDC_EDIT_DEBUG_DOWN_SIZE, _T("0x0"));
+
+		m_debugDlg.m_combox_debug_media_type.AddString(_T("spi nand"));
+		m_debugDlg.m_combox_debug_media_type.AddString(_T("emmc"));
+
+
+		int commandcount = GetPrivateProfileInt(TEXT("CommandCount"), TEXT("numOfCommand"), 0, exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+
+		GetPrivateProfileString(TEXT("SystemConf"), TEXT("mediaType"), TEXT(" "),
+			GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+			exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+
+		if (!GetTmp.Compare(_T(LIBUSB_MEDIA_SPINAND)))
+		{
+			m_debugDlg.m_combox_debug_media_type.SetCurSel(0);
+			m_debugDlg.m_media_type_status.SetWindowTextW(GetTmp);
+		}
+		if (!GetTmp.Compare(_T(LIBUSB_MEDIA_EMMC)))
+		{
+			m_debugDlg.m_combox_debug_media_type.SetCurSel(1);
+			m_debugDlg.m_media_type_status.SetWindowTextW(GetTmp);
+		}
+
+		for (int i = 0; i < commandcount; i++)
+		{
+			GetUboot_Command.Format(_T("CMD%d"), i);
+
+			GetPrivateProfileString(TEXT("UBOOTCOMMAND"), GetUboot_Command, TEXT("NoCmd"),
+				GetTmp.GetBuffer(MAX_PATH), MAX_PATH,
+				exe_dir + TEXT(LIBUSB_VMCTOOLS_INI));
+
+			if (GetTmp.Compare(TEXT("NoCmd")))
+			{
+				m_debugDlg.m_combobox_debug_cmd.AddString(GetTmp);
+			}
+		}
+
+		if (commandcount != 0)
+		{
+			m_debugDlg.m_combobox_debug_cmd.SetCurSel(0);
+			int nSel = m_debugDlg.m_combobox_debug_cmd.GetCurSel();
+			if (nSel >= 0)
+			{
+				CString strSel;
+				m_debugDlg.m_combobox_debug_cmd.GetLBText(nSel, strSel);
+				m_debugDlg.setText(IDC_EDIT_DEBUG_DOWN_CMD, strSel);
+			}
+		}
+
 	}
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE

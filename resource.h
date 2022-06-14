@@ -6,6 +6,7 @@
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101
 #define IDD_VMCTOOLS_DIALOG             102
+#define IDI_ICON1                       125
 #define IDR_MAINFRAME                   128
 #define IDD_DIALOG_BURN                 130
 #define IDD_DIALOG_DEBUG                131
@@ -13,7 +14,6 @@
 #define IDB_BITMAP2                     135
 #define IDB_BITMAP3                     136
 #define IDB_BITMAP4                     137
-#define IDI_ICON1                       125
 #define IDC_TAB1                        1003
 #define IDC_BUTTON_TEST                 1005
 #define IDC_STATIC_VID                  1007
@@ -70,8 +70,7 @@
 #define IDC_STATIC_BURN_PIC_DEV4        1066
 #define IDC_STATIC_BURN_PIC_DEV5        1067
 #define IDC_EDIT_DEBUG_PRINT            1068
-#define IDC_BUTTON1                     1069
-#define IDC_BUTTON_SAVE_LOG             1069
+#define IDC_COMBO_BURN_MEDIA_TYPE       1071
 
 // Next default values for new objects
 // 
@@ -79,7 +78,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        139
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1070
+#define _APS_NEXT_CONTROL_VALUE         1072
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
