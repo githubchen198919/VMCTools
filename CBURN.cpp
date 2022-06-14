@@ -425,7 +425,7 @@ CString CBURN::MyFunctionBurnDownloadCmd(int dev_num, struct _libusb_work_sb* my
 		{
 			ret = libusb_bulk_transfer(myfunc_work_sb->handle, myfunc_work_sb->ep_bulkin,
 				myfunc_work_sb->buffer, sizeof(myfunc_work_sb->buffer),
-				&myfunc_work_sb->transfered, TIMEOUT * 200);
+				&myfunc_work_sb->transfered, TIMEOUT * 35);
 			if (ret == 0)
 			{
 				if (strncmp(EOT_OK, (char*)myfunc_work_sb->buffer, myfunc_work_sb->transfered) == 0)
