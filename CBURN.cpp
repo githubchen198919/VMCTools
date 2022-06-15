@@ -206,12 +206,12 @@ CString CBURN::MyFunctionBurnHandshake(struct _libusb_work_sb* myfunc_work_sb)
 	myfunc_work_sb->buffer[0] = USTART;
 	ret = libusb_bulk_transfer(myfunc_work_sb->handle, myfunc_work_sb->ep_bulkout,
 		myfunc_work_sb->buffer, 1,
-		&myfunc_work_sb->transfered, TIMEOUT);
+		&myfunc_work_sb->transfered, TIMEOUT - 1000);
 	if (ret == 0)
 	{
 		ret = libusb_bulk_transfer(myfunc_work_sb->handle, myfunc_work_sb->ep_bulkin,
 			myfunc_work_sb->buffer,
-			sizeof(myfunc_work_sb->buffer), &myfunc_work_sb->transfered, TIMEOUT);
+			sizeof(myfunc_work_sb->buffer), &myfunc_work_sb->transfered, TIMEOUT - 1000);
 
 		if (ret == 0)
 		{
@@ -425,7 +425,7 @@ CString CBURN::MyFunctionBurnDownloadCmd(int dev_num, struct _libusb_work_sb* my
 		{
 			ret = libusb_bulk_transfer(myfunc_work_sb->handle, myfunc_work_sb->ep_bulkin,
 				myfunc_work_sb->buffer, sizeof(myfunc_work_sb->buffer),
-				&myfunc_work_sb->transfered, TIMEOUT * 35);
+				&myfunc_work_sb->transfered, TIMEOUT * 30);
 			if (ret == 0)
 			{
 				if (strncmp(EOT_OK, (char*)myfunc_work_sb->buffer, myfunc_work_sb->transfered) == 0)
@@ -1014,10 +1014,40 @@ UINT CBURN::MyFunctionBurnSpiNandImage(int dev_num, struct _libusb_work_sb* myfu
 	int burn_success_num;
 	CString burn_plan;
 	CString bus_hub_num;
+	CString cmd_status;
 		
 	CString  exe_dir;
 	CString str_boot_dir, str_boot_name;
 	char char_boot_name[MAX_PATH] = { 0 };
+
+	// 握手交互
+	cmd_status = MyFunctionBurnHandshake(myfunc_work_sb);
+	if (!cmd_status.Compare(_T("ERROR")))
+	{
+		global_print.Lock();
+		MyFunctionPrintDebug(dev_num, _T("Handshake failure, out of the burn."));
+		global_print.Unlock();
+
+		global_Mutex.Lock();
+		GetDlgItemText(IDC_EDIT_FAIL, fial_num);
+		burn_fail_num = _tcstoul(fial_num, NULL, 10);
+		burn_fail_num += 1;
+		fial_num.Format(_T("%d"), burn_fail_num);
+		SetDlgItemText(IDC_EDIT_FAIL, fial_num);
+		global_Mutex.Unlock();
+
+		MyFunctionBurnCheckDeleteButton();
+
+		MyFunctionBurnFailedIcon(dev_num);
+
+		return -1;
+	}
+	else
+	{
+		global_print.Lock();
+		MyFunctionPrintDebug(dev_num, _T("(OK)"));
+		global_print.Unlock();
+	}
 
 	exe_dir = MyFunctionBurnGetExePath();
 
@@ -1183,7 +1213,7 @@ UINT CBURN::MyFunctionBurnSpiNandImage(int dev_num, struct _libusb_work_sb* myfu
 	}
 
 	// 二 : 执行烧录
-	CString cmd_status;
+	
 	for (i = 0; i < imagecount; i++)
 	{
 		if (myfunc_burn_sb[i].NeedBurn)
@@ -1312,15 +1342,6 @@ UINT CBURN::MyFunctionBurnSpiNandImage(int dev_num, struct _libusb_work_sb* myfu
 
 		//检查删除设备按钮
 		MyFunctionBurnCheckDeleteButton();
-
-		/*UINT i = MessageBoxTimeout(NULL, _T("5s 将自动重启，是否重启？"), _T("温馨提示"),
-			MB_YESNO | MB_ICONINFORMATION,
-			GetSystemDefaultLangID(),
-			5000);
-		if (i == IDNO)
-		{
-			goto NandBurnImageEnd;
-		}*/
 
 		if (m_need_reset.GetCheck() == 1)
 		{	
@@ -1701,9 +1722,8 @@ void CBURN::UpdateAccessDevice()
 	//int dev_num = 0;
 	int i = 0, j;
 	int ep_cnt;
-	CString str_vid(_T("0x0AC8"));
-	CString str_pid(_T("0x7680"));
-	CString kk;
+	CString str_vid(_T(LIBUSB_VID));
+	CString str_pid(_T(LIBUSB_PID));
 
 	//GetDlgItem(IDC_EDIT_DEBUG_VID)->GetWindowText(str_vid);
 	//GetDlgItem(IDC_EDIT_DEBUG_PID)->GetWindowText(str_pid);
@@ -1725,9 +1745,6 @@ void CBURN::UpdateAccessDevice()
 
 		goto get_failed;
 	}
-
-
-
 
 	/* check the matched device */
 	while ((my_usbdev = my_access_list[i++]) != NULL)
@@ -1874,7 +1891,7 @@ UINT CBURN::UpdateAccessDevice1()
 		Sleep(1000);
 	}
 
-	MessageBoxTimeout(NULL, _T("自动扫描设备结束，即将开始烧录"), _T("温馨提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 1000);
+	//MessageBoxTimeout(NULL, _T("自动扫描设备结束，即将开始烧录"), _T("温馨提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 1000);
 
 	return 0;
 }
@@ -2175,25 +2192,14 @@ void CBURN::InitBurnProgress()
 	m_burn_plan_dev5.SetWindowTextW(_T("0%"));
 
 	SetDlgItemText(IDC_EDIT_DEBUG_PRINT, _T(""));
+
+	SetDlgItemText(IDC_EDIT_SUCCESS, _T("0"));
+	SetDlgItemText(IDC_EDIT_FAIL, _T("0"));
 }
 
 void CBURN::OnBnClickedButtonStartBurn()
 {
 	// TODO: 在此添加控件通知处理程序代码
-	// 自动
-	m_button_start_burn.EnableWindow(false);
-	m_button_access_device.EnableWindow(false);
-
-	IsStop = 1;
-	
-	if (m_auto_device_pThread != NULL)
-	{
-		WaitForSingleObject(m_auto_device_pThread->m_hThread, INFINITE); //等待线程结束
-		//delete m_auto_device_pThread;
-		m_auto_device_pThread = NULL;
-	}
-	
-
 	CWinThread* m_pThread_dev_0 = nullptr;
 	CWinThread* m_pThread_dev_1 = nullptr;
 	CWinThread* m_pThread_dev_2 = nullptr;
@@ -2203,20 +2209,33 @@ void CBURN::OnBnClickedButtonStartBurn()
 
 	CString GetMediaType;
 	CString tatol_dev;
-	CString Handshake_status;
 	int tatol_dev_num, dev_i;
 
 	CString fial_num;
 	int burn_fail_num;
 
+	// 自动
+	m_button_start_burn.EnableWindow(false);
+	m_button_access_device.EnableWindow(false);
+
+	IsStop = 1;
+
+	InitBurnProgress();
+	
+	if (m_auto_device_pThread != NULL)
+	{
+		WaitForSingleObject(m_auto_device_pThread->m_hThread, INFINITE); //等待线程结束
+		//delete m_auto_device_pThread;
+		m_auto_device_pThread = NULL;
+	}
+
+	global_print.Lock();
+	MyFunctionPrintDebug(-1, _T("Automatic scan device exit."));
+	global_print.Unlock();
+
 	//m_button_access_device.EnableWindow(false);
 	// 关闭删除按钮
 	//m_button_delete_device.EnableWindow(false);
-
-	SetDlgItemText(IDC_EDIT_SUCCESS, _T("0"));
-	SetDlgItemText(IDC_EDIT_FAIL, _T("0"));
-
-	InitBurnProgress();
 
 	GetDlgItemText(IDC_EDIT_TOTAL, tatol_dev);
 	tatol_dev_num = _tcstoul(tatol_dev, NULL, 10);
@@ -2248,30 +2267,8 @@ void CBURN::OnBnClickedButtonStartBurn()
 			switch (dev_i)
 			{
 				case 0:
-					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[0]);
-					if (!Handshake_status.Compare(_T("ERROR")))
-					{
-						global_print.Lock();
-						MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-						global_print.Unlock();
-
-						GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						burn_fail_num = _tcstoul(fial_num, NULL, 10);
-						burn_fail_num += 1;
-						fial_num.Format(_T("%d"), burn_fail_num);
-						SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-
-						MyFunctionBurnCheckDeleteButton();
-
-						m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-						break;
-					}
-
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("(OK)"));
-					global_print.Unlock();
-
 					m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 					m_pThread_dev_0 = AfxBeginThread(ThreadSpiNandDevice0, this);
 					if (m_pThread_dev_0 == NULL)
 					{
@@ -2279,35 +2276,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 						m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 						global_print.Lock();
-						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 						global_print.Unlock();
 					}
 
 					break;
 				case 1:
-					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[1]);
-					if (!Handshake_status.Compare(_T("ERROR")))
-					{
-						global_print.Lock();
-						MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-						global_print.Unlock();
-
-						GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						burn_fail_num = _tcstoul(fial_num, NULL, 10);
-						burn_fail_num += 1;
-						fial_num.Format(_T("%d"), burn_fail_num);
-						SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						MyFunctionBurnCheckDeleteButton();
-
-						m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-						break;
-					}
-
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("(OK)"));
-					global_print.Unlock();
-
 					m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 					m_pThread_dev_1 = AfxBeginThread(ThreadSpiNandDevice1, this);
 					if (m_pThread_dev_1 == NULL)
 					{
@@ -2315,35 +2291,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 						m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 						global_print.Lock();
-						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 						global_print.Unlock();
 					}
 
 					break;
 				case 2:
-					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[2]);
-					if (!Handshake_status.Compare(_T("ERROR")))
-					{
-						global_print.Lock();
-						MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-						global_print.Unlock();
-
-						GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						burn_fail_num = _tcstoul(fial_num, NULL, 10);
-						burn_fail_num += 1;
-						fial_num.Format(_T("%d"), burn_fail_num);
-						SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						MyFunctionBurnCheckDeleteButton();
-
-						m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-						break;
-					}
-
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("(OK)"));
-					global_print.Unlock();
-
 					m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 					m_pThread_dev_2 = AfxBeginThread(ThreadSpiNandDevice2, this);
 					if (m_pThread_dev_2 == NULL)
 					{
@@ -2351,35 +2306,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 						m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 						global_print.Lock();
-						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 						global_print.Unlock();
 					}
 
 					break;
 				case 3:
-					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[3]);
-					if (!Handshake_status.Compare(_T("ERROR")))
-					{
-						global_print.Lock();
-						MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-						global_print.Unlock();
-
-						GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						burn_fail_num = _tcstoul(fial_num, NULL, 10);
-						burn_fail_num += 1;
-						fial_num.Format(_T("%d"), burn_fail_num);
-						SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						MyFunctionBurnCheckDeleteButton();
-
-						m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-						break;
-					}
-
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("(OK)"));
-					global_print.Unlock();
-
 					m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 					m_pThread_dev_3 = AfxBeginThread(ThreadSpiNandDevice3, this);
 					if (m_pThread_dev_3 == NULL)
 					{
@@ -2387,35 +2321,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 						m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 						global_print.Lock();
-						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 						global_print.Unlock();
 					}
 
 					break;
 				case 4:
-					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[4]);
-					if (!Handshake_status.Compare(_T("ERROR")))
-					{
-						global_print.Lock();
-						MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-						global_print.Unlock();
-
-						GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						burn_fail_num = _tcstoul(fial_num, NULL, 10);
-						burn_fail_num += 1;
-						fial_num.Format(_T("%d"), burn_fail_num);
-						SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						MyFunctionBurnCheckDeleteButton();
-
-						m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-						break;
-					}
-
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("(OK)"));
-					global_print.Unlock();
-
 					m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 					m_pThread_dev_4 = AfxBeginThread(ThreadSpiNandDevice4, this);
 					if (m_pThread_dev_4 == NULL)
 					{
@@ -2423,35 +2336,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 						m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 						global_print.Lock();
-						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 						global_print.Unlock();
 					}
 
 					break;
 				case 5:
-					Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[5]);
-					if (!Handshake_status.Compare(_T("ERROR")))
-					{
-						global_print.Lock();
-						MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-						global_print.Unlock();
-
-						GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						burn_fail_num = _tcstoul(fial_num, NULL, 10);
-						burn_fail_num += 1;
-						fial_num.Format(_T("%d"), burn_fail_num);
-						SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-						MyFunctionBurnCheckDeleteButton();
-
-						m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-						break;
-					}
-
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("(OK)"));
-					global_print.Unlock();
-
 					m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 					m_pThread_dev_5 = AfxBeginThread(ThreadSpiNandDevice5, this);
 					if (m_pThread_dev_5 == NULL)
 					{
@@ -2459,7 +2351,7 @@ void CBURN::OnBnClickedButtonStartBurn()
 						m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 						global_print.Lock();
-						MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+						MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 						global_print.Unlock();
 					}
 
@@ -2472,9 +2364,6 @@ void CBURN::OnBnClickedButtonStartBurn()
 	{
 		// 自动
 		//m_button_start_burn.EnableWindow(true);
-
-		//MessageBox(TEXT("emmc烧录，暂未支持！！！"), TEXT("温馨提示"), MB_OK | MB_ICONWARNING);
-		//goto error_end;
 
 		global_print.Lock();
 		MyFunctionPrintDebug(-1, _T("Emmc burning starts!!!"));
@@ -2489,30 +2378,8 @@ void CBURN::OnBnClickedButtonStartBurn()
 			switch (dev_i)
 			{
 			case 0:
-				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[0]);
-				if (!Handshake_status.Compare(_T("ERROR")))
-				{
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-					global_print.Unlock();
-
-					GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					burn_fail_num = _tcstoul(fial_num, NULL, 10);
-					burn_fail_num += 1;
-					fial_num.Format(_T("%d"), burn_fail_num);
-					SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-
-					MyFunctionBurnCheckDeleteButton();
-
-					m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-					break;
-				}
-
-				global_print.Lock();
-				MyFunctionPrintDebug(dev_i, _T("(OK)"));
-				global_print.Unlock();
-
 				m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 				m_pThread_dev_0 = AfxBeginThread(ThreadEmmcDevice0, this);
 				if (m_pThread_dev_0 == NULL)
 				{
@@ -2520,35 +2387,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 					m_pic_burn_dev0.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 					global_print.Lock();
-					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 					global_print.Unlock();
 				}
 
 				break;
 			case 1:
-				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[1]);
-				if (!Handshake_status.Compare(_T("ERROR")))
-				{
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-					global_print.Unlock();
-
-					GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					burn_fail_num = _tcstoul(fial_num, NULL, 10);
-					burn_fail_num += 1;
-					fial_num.Format(_T("%d"), burn_fail_num);
-					SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					MyFunctionBurnCheckDeleteButton();
-
-					m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-					break;
-				}
-
-				global_print.Lock();
-				MyFunctionPrintDebug(dev_i, _T("(OK)"));
-				global_print.Unlock();
-
 				m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 				m_pThread_dev_1 = AfxBeginThread(ThreadEmmcDevice1, this);
 				if (m_pThread_dev_1 == NULL)
 				{
@@ -2556,35 +2402,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 					m_pic_burn_dev1.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 					global_print.Lock();
-					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 					global_print.Unlock();
 				}
 
 				break;
 			case 2:
-				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[2]);
-				if (!Handshake_status.Compare(_T("ERROR")))
-				{
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-					global_print.Unlock();
-
-					GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					burn_fail_num = _tcstoul(fial_num, NULL, 10);
-					burn_fail_num += 1;
-					fial_num.Format(_T("%d"), burn_fail_num);
-					SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					MyFunctionBurnCheckDeleteButton();
-
-					m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-					break;
-				}
-
-				global_print.Lock();
-				MyFunctionPrintDebug(dev_i, _T("(OK)"));
-				global_print.Unlock();
-
 				m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 				m_pThread_dev_2 = AfxBeginThread(ThreadEmmcDevice2, this);
 				if (m_pThread_dev_2 == NULL)
 				{
@@ -2592,35 +2417,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 					m_pic_burn_dev2.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 					global_print.Lock();
-					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 					global_print.Unlock();
 				}
 
 				break;
 			case 3:
-				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[3]);
-				if (!Handshake_status.Compare(_T("ERROR")))
-				{
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-					global_print.Unlock();
-
-					GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					burn_fail_num = _tcstoul(fial_num, NULL, 10);
-					burn_fail_num += 1;
-					fial_num.Format(_T("%d"), burn_fail_num);
-					SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					MyFunctionBurnCheckDeleteButton();
-
-					m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-					break;
-				}
-
-				global_print.Lock();
-				MyFunctionPrintDebug(dev_i, _T("(OK)"));
-				global_print.Unlock();
-
 				m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 				m_pThread_dev_3 = AfxBeginThread(ThreadEmmcDevice3, this);
 				if (m_pThread_dev_3 == NULL)
 				{
@@ -2628,35 +2432,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 					m_pic_burn_dev3.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 					global_print.Lock();
-					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 					global_print.Unlock();
 				}
 
 				break;
 			case 4:
-				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[4]);
-				if (!Handshake_status.Compare(_T("ERROR")))
-				{
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-					global_print.Unlock();
-
-					GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					burn_fail_num = _tcstoul(fial_num, NULL, 10);
-					burn_fail_num += 1;
-					fial_num.Format(_T("%d"), burn_fail_num);
-					SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					MyFunctionBurnCheckDeleteButton();
-
-					m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-					break;
-				}
-
-				global_print.Lock();
-				MyFunctionPrintDebug(dev_i, _T("(OK)"));
-				global_print.Unlock();
-
 				m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 				m_pThread_dev_4 = AfxBeginThread(ThreadEmmcDevice4, this);
 				if (m_pThread_dev_4 == NULL)
 				{
@@ -2664,35 +2447,14 @@ void CBURN::OnBnClickedButtonStartBurn()
 					m_pic_burn_dev4.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 					global_print.Lock();
-					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 					global_print.Unlock();
 				}
 
 				break;
 			case 5:
-				Handshake_status = MyFunctionBurnHandshake(&libusb_work_sb_burn[5]);
-				if (!Handshake_status.Compare(_T("ERROR")))
-				{
-					global_print.Lock();
-					MyFunctionPrintDebug(dev_i, _T("Handshake failure, out of the burn."));
-					global_print.Unlock();
-
-					GetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					burn_fail_num = _tcstoul(fial_num, NULL, 10);
-					burn_fail_num += 1;
-					fial_num.Format(_T("%d"), burn_fail_num);
-					SetDlgItemText(IDC_EDIT_FAIL, fial_num);
-					MyFunctionBurnCheckDeleteButton();
-
-					m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
-					break;
-				}
-
-				global_print.Lock();
-				MyFunctionPrintDebug(dev_i, _T("(OK)"));
-				global_print.Unlock();
-
 				m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burning);
+
 				m_pThread_dev_5 = AfxBeginThread(ThreadEmmcDevice5, this);
 				if (m_pThread_dev_5 == NULL)
 				{
@@ -2700,7 +2462,7 @@ void CBURN::OnBnClickedButtonStartBurn()
 					m_pic_burn_dev5.SetBitmap((HBITMAP)bitmap_dev.bitmap_burn_fail);
 
 					global_print.Lock();
-					MyFunctionPrintDebug(-1, _T("Burn abnormal"));
+					MyFunctionPrintDebug(-1, _T("Burn abnormal."));
 					global_print.Unlock();
 				}
 
