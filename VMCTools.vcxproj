@@ -101,6 +101,7 @@
       <StackReserveSize>104857600</StackReserveSize>
       <HeapReserveSize>
       </HeapReserveSize>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -126,6 +127,7 @@
       <SubSystem>Windows</SubSystem>
       <AdditionalLibraryDirectories>D:\vs2019prj\Prj\VMCTools\libx64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <StackReserveSize>104857600</StackReserveSize>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -155,6 +157,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>D:\vs2019prj\Prj\VMCTools\libx86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <StackReserveSize>104857600</StackReserveSize>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -184,6 +187,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <StackReserveSize>104857600</StackReserveSize>
       <AdditionalLibraryDirectories>D:\vs2019prj\Prj\VMCTools\libx64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
