@@ -1701,9 +1701,8 @@ void CBURN::UpdateAccessDevice()
 	//int dev_num = 0;
 	int i = 0, j;
 	int ep_cnt;
-	CString str_vid(_T("0x0AC8"));
-	CString str_pid(_T("0x7680"));
-	CString kk;
+	CString str_vid(_T(LIBUSB_VID));
+	CString str_pid(_T(LIBUSB_PID));
 
 	//GetDlgItem(IDC_EDIT_DEBUG_VID)->GetWindowText(str_vid);
 	//GetDlgItem(IDC_EDIT_DEBUG_PID)->GetWindowText(str_pid);
@@ -1725,9 +1724,6 @@ void CBURN::UpdateAccessDevice()
 
 		goto get_failed;
 	}
-
-
-
 
 	/* check the matched device */
 	while ((my_usbdev = my_access_list[i++]) != NULL)
@@ -1874,7 +1870,7 @@ UINT CBURN::UpdateAccessDevice1()
 		Sleep(1000);
 	}
 
-	MessageBoxTimeout(NULL, _T("自动扫描设备结束，即将开始烧录"), _T("温馨提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 1000);
+	//MessageBoxTimeout(NULL, _T("自动扫描设备结束，即将开始烧录"), _T("温馨提示"), MB_ICONINFORMATION, GetSystemDefaultLangID(), 1000);
 
 	return 0;
 }
@@ -2185,14 +2181,15 @@ void CBURN::OnBnClickedButtonStartBurn()
 	m_button_access_device.EnableWindow(false);
 
 	IsStop = 1;
-	
+
+#if 0
 	if (m_auto_device_pThread != NULL)
 	{
 		WaitForSingleObject(m_auto_device_pThread->m_hThread, INFINITE); //等待线程结束
 		//delete m_auto_device_pThread;
 		m_auto_device_pThread = NULL;
 	}
-	
+#endif
 
 	CWinThread* m_pThread_dev_0 = nullptr;
 	CWinThread* m_pThread_dev_1 = nullptr;
